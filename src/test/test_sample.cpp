@@ -69,9 +69,10 @@ int main (int argc, char* argv[]) {
         PAPI_create_eventset(&eventset);
         PAPI_add_named_event(eventset, "PAPI_L3_TCM");
         PAPI_add_named_event(eventset, "PAPI_L3_TCA");
+        PAPI_start(eventset);
         
         double t1 = wall_seconds();
-        PAPI_start(eventset);
+        
         sampling(delta, g, rrsets, tags);
         PAPI_stop(eventset, val);
 

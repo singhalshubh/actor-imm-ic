@@ -34,10 +34,10 @@ extern "C" {
 #include <sstream>
 #include <fstream>
 
-#include "../ic/graph.h"
-#include "../ic/utils.h"
-#include "../ic_1d++/sampling.h"
-#include "../ic_1d++/select.h"
+#include "graph.h"
+#include "utils.h"
+#include "sampling.h"
+#include "select.h"
 
 int main (int argc, char* argv[]) {
     const char *deps[] = { "system", "bale_actor" };
