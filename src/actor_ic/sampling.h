@@ -29,7 +29,7 @@ public:
     }
 };
 
-void sampling(size_t delta, graph *g, std::vector<std::set<uint64_t>> &rrsets, std::vector<uint64_t> &tags) {
+void sampling(size_t delta, graph *g, std::vector<std::vector<uint64_t>> &rrsets, std::vector<uint64_t> &tags) {
     SampleSelector ss(tags);
     hclib::finish([&] {
         trng::lcg64 generator;
@@ -42,7 +42,7 @@ void sampling(size_t delta, graph *g, std::vector<std::set<uint64_t>> &rrsets, s
         bitvec visited(g->num_vertices);
         for(uint64_t pos = 0; pos < delta; pos++) {
             //T0_fprintf(stderr, "pos: %ld\n", pos); 
-            rrsets.push_back(std::set<uint64_t>());
+            rrsets.push_back(std::vector<uint64_t>());
             uint64_t rrset_size = rrsets.size();
             
             visited.reset();
@@ -53,7 +53,7 @@ void sampling(size_t delta, graph *g, std::vector<std::set<uint64_t>> &rrsets, s
             while(!frontier.empty()) {
                 uint64_t u = frontier.front();
                 frontier.pop();
-                rrsets[rrset_size - 1].insert(u);
+                rrsets[rrset_size - 1].push_back(u);
                 ss.send(0, u, u%THREADS);
                 uint64_t start = g->row_offsets[u];
                 uint64_t end = g->row_offsets[u + 1];
@@ -66,7 +66,16 @@ void sampling(size_t delta, graph *g, std::vector<std::set<uint64_t>> &rrsets, s
                     }
                 }
             }
+            // std::sort(rrsets[pos].begin(), rrsets[pos].end(), [](const uint64_t& a, const uint64_t& b){
+            //     return a < b;
+            // });
         }
         ss.done();
     });
+    for (auto& rrset : rrsets) { 
+        std::sort(rrset.begin(), rrset.end(), [](uint64_t a, uint64_t b) {
+            return a < b;
+        });
+    }
+
 }

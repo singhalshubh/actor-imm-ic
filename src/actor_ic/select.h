@@ -1,13 +1,20 @@
+typedef struct tagpkt {
+    uint64_t pe;
+    uint64_t count;
+} tagpkt_t;
+
 uint64_t adjustPull(convey_t *conv, std::vector<uint64_t> &replica_tags, bool &done) {
-    uint64_t pkt;
+    tagpkt_t pkt;
     while(convey_pull(conv, &pkt, NULL) == convey_OK) {
-        replica_tags[pkt/THREADS] -= 1;
+        replica_tags[pkt.pe/THREADS] -= pkt.count;
     }
     return convey_advance(conv, done);
 }
 
-uint64_t select(std::vector<uint64_t> &tags, std::vector<std::set<uint64_t>> &rrsets, 
+uint64_t select(std::vector<uint64_t> &tags, std::vector<std::vector<uint64_t>> &rrsets, 
         uint64_t k, std::vector<uint64_t> &influencers) {
+
+    std::unordered_map<uint64_t, uint64_t> tag_map;
     
     influencers.clear();
     std::vector<char> bitset(rrsets.size(), 1);
@@ -55,50 +62,52 @@ uint64_t select(std::vector<uint64_t> &tags, std::vector<std::set<uint64_t>> &rr
             replica_tags[curr_influencer/THREADS] = 0;
         }
 
-        bool done = false;
+        // bool done = false;
         uint64_t send_pkt;
         uint64_t index = 0;
         bool numpushed = true;
-        std::set<uint64_t>::iterator v;
-        if (convey_begin(conv, sizeof(uint64_t), 0) != convey_OK) return(-1);
+        std::vector<uint64_t>::iterator v;
+        if (convey_begin(conv, sizeof(tagpkt_t), 0) != convey_OK) return(-1);
 
-        for(;index < bitset.size();) {
-            if(bitset[index] == 1 && rrsets[index].find(curr_influencer) != rrsets[index].end()) {
+        for(;index < bitset.size(); index++) {
+            if(bitset[index] == 1 && std::binary_search(rrsets[index].begin(), rrsets[index].end(), curr_influencer)) {
                 bitset[index] = 0;
                 v = rrsets[index].begin();
-                for(;v != rrsets[index].end();) {
+                for(;v != rrsets[index].end(); v++) {
                     if(*v == curr_influencer) {
-                        v++;
+                        // v++;
                         continue;
                     }
                     send_pkt = *v;
                     uint64_t send_pe = send_pkt%THREADS;
                     if(send_pe != MYTHREAD) {
-                        if(convey_push(conv, &send_pkt, send_pe) != convey_OK) {
-                            numpushed = false;
-                            adjustPull(conv, replica_tags, done);
-                        }
-                        else {
-                            numpushed = true;
-                            v++;
-                        }
+                        tag_map[send_pkt]++;
                     }
                     else {
                         replica_tags[send_pkt/THREADS] -= 1;
-                        v++;
                     }
                 }
-                if(numpushed) {
-                    index++;
-                }
-            }
-            else {
-                index++;
             }
         }
+
+        bool done = false;
+        tagpkt_t pkt;
+        for(auto it = tag_map.begin(); it != tag_map.end();) {
+            pkt.pe = it->first;
+            pkt.count = it->second;
+            uint64_t send_pe = pkt.pe%THREADS;
+            if(convey_push(conv, &pkt, send_pe) != convey_OK) {
+                adjustPull(conv, replica_tags, done);
+            }
+            else {
+                ++it;
+            }
+        }
+
         done = true;
         while(adjustPull(conv, replica_tags, done));
         convey_reset(conv);
+        tag_map.clear();
         #ifdef DEBUG
             fprintf(stderr, "\n");
             for(int i = 0; i < replica_tags.size(); i++) {

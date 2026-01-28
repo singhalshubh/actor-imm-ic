@@ -5,7 +5,6 @@ extern "C" {
 }
 #include <std_options.h>
 #include <string>
-#include <set>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -13,6 +12,7 @@ extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <unordered_map>
 #include <vector>
 #include <queue>
 #include <sys/stat.h>
@@ -69,7 +69,7 @@ int main (int argc, char* argv[]) {
         graph *g = new graph;
         g->load_graph(fileName);
         if(k > g->num_vertices/2) exit(-1);
-        std::vector<std::set<uint64_t>> rrsets;
+        std::vector<std::vector<uint64_t>> rrsets;
         std::vector<uint64_t> tags(g->num_vertices/THREADS + 1, 0);
         std::vector<uint64_t> influencers;
         double sample_time = 0.0, select_time = 0.0;
